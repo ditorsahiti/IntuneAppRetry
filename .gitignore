@@ -1,0 +1,7 @@
+*.log
+*.reg
+manifest.json
+capture.json
+.vs/
+.vscode/
+Thumbs.db

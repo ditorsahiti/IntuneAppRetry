@@ -1,5 +1,4 @@
 # Intune App Retry
-# Intune App Retry
 
 WPF-based PowerShell tool
 

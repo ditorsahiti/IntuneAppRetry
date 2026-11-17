@@ -1,6 +1,7 @@
 # Intune App Retry
+# Intune App Retry
 
-WPF-based PowerShell tool (single file) for IT support to **troubleshoot and re-trigger failed Intune Win32 app installations** locally on a Windows client – with registry backups, live monitoring and installation cache capture.
+WPF-based PowerShell tool
 
 > ⚠️ **Disclaimer:** Deleting Intune Management Extension (IME) registry keys is an **unsupported troubleshooting workaround**. A reset does not guarantee installation success. Use at your own risk.
 
@@ -45,7 +46,7 @@ WPF-based PowerShell tool (single file) for IT support to **troubleshoot and re-
 
 ## Overview
 
-This can take hours. Intune App Retry gives support staff a guided, safeguarded way to:
+When a Win32 app installation fails, the Intune Management Extension only retries it according to its internal retry schedule. This can take hours. Intune App Retry
 
 - **find** all failed Win32 app installations on the device,
 - **identify** them by name (via Microsoft Graph or IME logs),
@@ -73,7 +74,7 @@ Everything runs locally in a single PowerShell file with a WPF GUI. No modules o
 |------|-------------|
 | **Scan** | Reads the IME registry (`Win32Apps`) and lists failed app contexts with readable status (Waiting / Pending / Installing / Installed / Failed), error code and enforcement state. |
 | **Names** | Optional: resolves app names via Microsoft Graph (Device Code Flow sign-in, read-only `DeviceManagementApps.Read.All`, requires an account authorized to read Intune apps). Falls back to names from the registry and IME logs. |
-| **Retry** |
+| **Retry** | Backs up and deletes the app result key and GRS key of the selected app, restarts IME and triggers an MDM sync so the installation is re-evaluated. |
 | **Monitor** | Live monitor after a retry (every 15 s, max. 30 min). Reads all registry contexts and new IME log entries and writes the outcome to the manifest. |
 | **History** | Lists all retries from the backup manifests (time, operator, app, outcome). |
 | **Cache capture** | Optional: copies the app's `C:\Windows\IMECache\<AppId>[_version]` folders during retry/monitoring to `C:\Temp\IntuneAppRetry-Cache` (best effort). |
@@ -171,10 +172,10 @@ Restart-Service IntuneManagementExtension
 |---------|------------------|
 | `Please use 64-bit Windows PowerShell.` | Started from 32-bit PowerShell. Use `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`. |
 | `Please start with powershell.exe -STA -File.` | WPF requires STA. Start with the command shown under [Quick start](#quick-start). |
-| Access denied
+| Access denied | The tool was not started as administrator. Open PowerShell with *Run as administrator*. |
 | Device code sign-in is blocked | Device Code Flow is blocked by Conditional Access in the tenant. Ask your Entra ID admin to allow it for the Microsoft Graph Command Line Tools client. |
 | Graph connected, but app names stay unknown | The signed-in account lacks read permission for the Intune apps, or `DeviceManagementApps.Read.All` has no administrator consent. |
-| No failed apps found |
+| No failed apps found | There are currently no failed Win32 app contexts in the IME registry, or IME has not yet reported a result. Trigger **MDM sync now** and scan again later. |
 | App fails again after retry | The reset only re-triggers the installation. Check the error code, the IME logs (**Backups / Logs**) and the app package itself. |
 
 ## Changelog
@@ -188,3 +189,5 @@ Free to use in unmodified form. Changes are welcome as contributions to this rep
 ## Author
 
 Sahiti Ditor — Version 1.3
+
+Contact: [ditor.sahiti@outlook.com](mailto:ditor.sahiti@outlook.com)

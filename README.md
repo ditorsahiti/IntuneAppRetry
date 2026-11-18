@@ -48,7 +48,7 @@ WPF-based PowerShell tool (single file) for IT support to **troubleshoot and re-
 When a Win32 app installation fails, the Intune Management Extension only retries it according to its internal retry schedule. This can take hours. Intune App Retry gives support staff a guided, safeguarded way to:
 
 - **find** all failed Win32 app installations on the device,
-- **identify** them by name (via Microsoft Graph or locally from IME logs),
+- **identify** them by name (from the registry and IME logs, with optional Microsoft Graph lookup),
 - **reset** the local app policy state (app result key + GRS key) with a verified backup,
 - **re-trigger** the installation without waiting for the retry schedule (IME restart + MDM sync),
 - **monitor** the new installation attempt live,
@@ -59,7 +59,7 @@ Everything runs locally in a single PowerShell file with a WPF GUI. No modules o
 
 ## Screenshots
 
-**Local scan (without Graph)** – failed app detected, name unknown:
+**Local scan (without Graph)** – example where no local name was available. Names can also be resolved without Graph when matching registry values or IME policy log records are present:
 
 ![Local scan without Graph](docs/screenshot-scan.png)
 
@@ -72,7 +72,7 @@ Everything runs locally in a single PowerShell file with a WPF GUI. No modules o
 | Step | Description |
 |------|-------------|
 | **Scan** | Reads the IME registry (`Win32Apps`) and lists failed app contexts with readable status (Waiting / Pending / Installing / Installed / Failed), error code and enforcement state. |
-| **Names** | Optional: resolves app names via Microsoft Graph (Device Code Flow sign-in, read-only `DeviceManagementApps.Read.All`, requires an account authorized to read Intune apps). Falls back to names from the registry and IME logs. |
+| **Names** | Automatically checks the local registry and IME policy logs without sign-in. Microsoft Graph is optional for names missing locally or for current cloud names (Device Code Flow, `DeviceManagementApps.Read.All`, and an account authorized to read Intune apps). |
 | **Retry** | Backs up and deletes the app result key and GRS key of the selected app, restarts IME and triggers an MDM sync so the installation is re-evaluated. |
 | **Monitor** | Live monitor after a retry (every 15 s, max. 30 min). Reads all registry contexts and new IME log entries and writes the outcome to the manifest. |
 | **History** | Lists all retries from the backup manifests (time, operator, app, outcome). |
@@ -88,18 +88,27 @@ The tool reads all user and device contexts under `HKLM\SOFTWARE\Microsoft\Intun
 - readable status (Waiting / Pending / Installing / Installed / Failed),
 - error code and enforcement state,
 - app ID, context (user/device) and the matching GRS key,
-- the source of the app name (Graph, IME log or unknown).
+- the source of the app name (Registry, IME log, Microsoft Graph or unknown).
 
 Only **failed** app contexts are listed. The scan is read-only.
 
-### 2. Resolve app names (optional)
+### 2. Resolve app names
 
-App names are not always available in the local registry. If missing, they are resolved:
+Every scan attempts local name resolution without Microsoft Graph sign-in:
 
-1. **Locally** from IME log files (no sign-in required).
-2. **Via Microsoft Graph** after clicking **Resolve app names**. The tool starts a Device Code Flow, shows the code in the GUI (with copy and open-login buttons) and queries `deviceAppManagement/mobileApps` with read-only permissions.
+1. Reads `DisplayName` or `AppName` from the app's local registry key under `HKLM\SOFTWARE\Microsoft\IntuneManagementExtension\Win32Apps`.
+2. For missing names, searches up to 18 of the newest matching files under `C:\ProgramData\Microsoft\IntuneManagementExtension\Logs`: `AppWorkload`, `AppActionProcessor` and `IntuneManagementExtension` logs, including matching rotated files.
+3. Extracts explicit `Id` / `Name` pairs from `Get policies =` JSON records. It does not guess names from nearby log lines.
 
-Tokens and device codes stay in memory only. Graph is never required for the retry itself.
+Since version 1.3.1, the lookup handles policy JSON arrays directly in Windows PowerShell 5.1 and reports lookup counts plus JSON parsing and file-reading error counts in the activity log.
+
+If the relevant registry values or policy log records are absent, have rotated out, or cannot be read, the name may remain `(name unknown)`. Local names can also be older than the name currently shown in Intune.
+
+**Microsoft Graph is optional.** Click **Resolve app names** to use Device Code Flow and query `deviceAppManagement/mobileApps` with read-only permissions. Once connected, available Graph names take precedence over local names. Tokens and device codes stay in memory only.
+
+The local lookup contains no company-specific tenant configuration. It can be used across organizations meeting the requirements, but name availability depends on each device's local data. Graph access additionally depends on the organization's permissions and Conditional Access policies.
+
+Retry, monitoring and cache capture use app IDs and do not require Graph name resolution.
 
 ### 3. Reset the app policy state (Retry)
 
@@ -134,7 +143,7 @@ The monitor can be stopped (**Stop monitoring / cache**) or hidden at any time. 
 
 When **Get Installation Cache from Package** is checked, the tool copies the app's `C:\Windows\IMECache\<AppId>[_version]` folders to `C:\Temp\IntuneAppRetry-Cache` during the retry and live monitoring.
 
-IME usually removes these files
+IME may remove source files during cleanup. Copying does not lock the entire source folder or guarantee that IME waits for capture to finish; the saved package may be incomplete.
 
 The capture runs in the background, independent of the GUI, and checks for junctions and symbolic links. It is best effort: very fast installations may finish before everything is copied.
 
@@ -176,6 +185,7 @@ Restart-Service IntuneManagementExtension
 | `Please start with powershell.exe -STA -File.` | WPF requires STA. Start with the command shown under [Quick start](#quick-start). |
 | Access denied | The tool was not started as administrator. Open PowerShell with *Run as administrator*. |
 | Device code sign-in is blocked | Device Code Flow is blocked by Conditional Access in the tenant. Ask your Entra ID admin to allow it for the Microsoft Graph Command Line Tools client. |
+| App names stay unknown without Graph | Local registry values or matching policy log records may be missing, unreadable or rotated out. Check the `Local name lookup` activity entry; optionally use **Resolve app names** with Graph. |
 | Graph connected, but app names stay unknown | The signed-in account lacks read permission for the Intune apps, or `DeviceManagementApps.Read.All` has no administrator consent. |
 | No failed apps found | There are currently no failed Win32 app contexts in the IME registry, or IME has not yet reported a result. Trigger **MDM sync now** and scan again later. |
 | App fails again after retry | The reset only re-triggers the installation. Check the error code, the IME logs (**Backups / Logs**) and the app package itself. |

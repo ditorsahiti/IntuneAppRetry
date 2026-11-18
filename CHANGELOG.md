@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- Document automatic registry and IME-log name lookup, optional Graph fallback, and cross-organization requirements.
+- Clarify that installation cache capture is best effort and does not prevent IME cleanup.
+
 ## 1.3.2
 - **Cancel** and **Stop monitoring / cache** merged into one context-aware button (label changes: Cancel scan / Cancel sign-in / Cancel sync / Stop monitoring / cache)
 - Removed UTF-8 BOM and added a blank first line so the script can be copied and pasted from GitHub

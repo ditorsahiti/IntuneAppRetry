@@ -76,7 +76,7 @@ Everything runs locally in a single PowerShell file with a WPF GUI. No modules o
 | **Retry** | Backs up and deletes the app result key and GRS key of the selected app, restarts IME and triggers an MDM sync so the installation is re-evaluated. |
 | **Monitor** | Live monitor after a retry (every 15 s, max. 30 min). Reads all registry contexts and new IME log entries and writes the outcome to the manifest. |
 | **History** | Lists all retries from the backup manifests (time, operator, app, outcome). |
-| **Cancel** | Stops a running scan, Graph sign-in or MDM sync and re-enables the GUI. A running retry cannot be cancelled. |
+| **Cancel** | One context-aware button: cancels a running scan, Graph sign-in or MDM sync, or stops monitoring / cache copying after a retry. Never cancels a running registry reset or the Intune installation. |
 | **Cache capture** | Optional: copies the app's `C:\Windows\IMECache\<AppId>[_version]` folders during retry/monitoring to `C:\Temp\IntuneAppRetry-Cache` (best effort). |
 
 ## How it works

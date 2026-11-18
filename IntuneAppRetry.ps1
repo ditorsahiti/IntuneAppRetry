@@ -94,8 +94,7 @@ $script:Monitor = $null
    <Button x:Name="Logs" Content="Backups / Logs" Padding="12,10" Margin="0,0,10,0"/>
    <Button x:Name="History" Content="Retry history" Padding="12,10" Margin="0,0,10,0"/>
    <Button x:Name="SyncHelp" Content="MDM sync now" Padding="12,10"/>
-   <Button x:Name="CancelWork" Content="Cancel" Padding="12,10" Margin="10,0,0,0" IsEnabled="False" ToolTip="Cancels the running scan, Graph sign-in or MDM sync. A running retry cannot be cancelled."/>
-   <Button x:Name="StopObservation" Content="Stop monitoring / cache" Padding="12,10" Margin="10,0,0,0" IsEnabled="False" ToolTip="Stops observation and cache copying. Does not cancel the installation or registry/service recovery."/>
+   <Button x:Name="CancelWork" Content="Cancel" Padding="12,10" Margin="10,0,0,0" IsEnabled="False" ToolTip="Cancels the running scan, Graph sign-in or MDM sync, or stops monitoring / cache copying. Never cancels a running registry reset or the Intune installation."/>
    <CheckBox x:Name="CaptureCache" Content="Get Installation Cache from Package" Margin="12,8,0,8" VerticalAlignment="Center" ToolTip="During Retry, copy only this app's IMECache folders to C:\Temp\IntuneAppRetry-Cache. Files may be partial while extraction or cleanup is running."/>
   </WrapPanel>
   <Border x:Name="AuthPanel" Grid.Row="2" Margin="0,0,0,12" Padding="12" Visibility="Collapsed" CornerRadius="8" Background="#DFEDFF" BorderBrush="#ACC6ED" BorderThickness="1">
@@ -150,7 +149,7 @@ $script:Monitor = $null
 '@
 $reader = New-Object System.Xml.XmlNodeReader($xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
-foreach ($name in @('CancelWork','CancelSignIn','CaptureCache','StopObservation','Status','BusyBar','BusyText','History','MonitorPanel','StopMonitor','MonitorTitle','MonitorSteps','GraphState','Connect','Refresh','Retry','Logs','SyncHelp','Apps','Activity','SelectedDetails','AuthPanel','DeviceCode','CopyCode','OpenLogin')) {
+foreach ($name in @('CancelWork','CancelSignIn','CaptureCache','Status','BusyBar','BusyText','History','MonitorPanel','StopMonitor','MonitorTitle','MonitorSteps','GraphState','Connect','Refresh','Retry','Logs','SyncHelp','Apps','Activity','SelectedDetails','AuthPanel','DeviceCode','CopyCode','OpenLogin')) {
     Set-Variable -Name $name -Value $window.FindName($name) -Scope Script
 }
 # Shared registry and logging helpers keep scanning and monitoring consistent.
@@ -875,9 +874,10 @@ function Update-Buttons {
     $observing = $null -ne $script:Monitor -or $null -ne $script:CacheJob
     $Retry.IsEnabled = (-not $script:Busy -and -not $observing -and $goodGrs)
     $CaptureCache.IsEnabled = -not $script:Busy -and -not $observing
-    $StopObservation.IsEnabled = $observing -or ($script:Busy -and $null -ne $script:Job -and $script:Job.Action -eq 'Retry')
     $canCancel = $script:Busy -and $null -ne $script:Job -and $script:Job.Action -ne 'Retry' -and -not $script:Job.Cancelled
-    $CancelWork.IsEnabled = $canCancel
+    $retrying = $script:Busy -and $null -ne $script:Job -and $script:Job.Action -eq 'Retry'
+    $CancelWork.IsEnabled = $canCancel -or $observing -or $retrying
+    $CancelWork.Content = if ($observing -or $retrying) { 'Stop monitoring / cache' } elseif ($canCancel -and $script:Job.Action -eq 'Connect') { 'Cancel sign-in' } elseif ($canCancel -and $script:Job.Action -eq 'Sync') { 'Cancel sync' } elseif ($canCancel) { 'Cancel scan' } else { 'Cancel' }
     $CancelSignIn.IsEnabled = $canCancel
     $GraphState.Text = if ($Shared.GraphConnected) { 'Graph: connected' } else { 'Graph: not connected (optional)' }
 }
@@ -1357,9 +1357,10 @@ $History.Add_Click({
         [Windows.MessageBox]::Show([string]$_.Exception.Message, 'Intune App Retry', 'OK', 'Warning') | Out-Null
     }
 })
-$CancelWork.Add_Click({ Stop-Work })
+$CancelWork.Add_Click({
+    if ($null -ne $script:Monitor -or $null -ne $script:CacheJob -or ($null -ne $script:Job -and $script:Job.Action -eq 'Retry')) { Stop-Observation } else { Stop-Work }
+})
 $CancelSignIn.Add_Click({ Stop-Work })
-$StopObservation.Add_Click({ Stop-Observation })
 $Refresh.Add_Click({ Start-Work 'Refresh' $null })
 $Connect.Add_Click({ Start-Work 'Connect' $null })
 $CopyCode.Add_Click({

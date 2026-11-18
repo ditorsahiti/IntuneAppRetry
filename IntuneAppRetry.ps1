@@ -1,4 +1,4 @@
-﻿
+
 <#
 .SYNOPSIS
     Intune App Retry 1.3.1 - resets and re-triggers failed Intune Win32 app installations locally.

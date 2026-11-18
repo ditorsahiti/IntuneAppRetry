@@ -48,7 +48,7 @@ WPF-based PowerShell tool (single file) for IT support to **troubleshoot and re-
 When a Win32 app installation fails, the Intune Management Extension only retries it according to its internal retry schedule. This can take hours. Intune App Retry gives support staff a guided, safeguarded way to:
 
 - **find** all failed Win32 app installations on the device,
-- **identify** them by name (via Microsoft Graph, IME logs or the local IME log cache),
+- **identify** them by name (via Microsoft Graph or locally from IME logs),
 - **reset** the local app policy state (app result key + GRS key) with a verified backup,
 - **re-trigger** the installation without waiting for the retry schedule (IME restart + MDM sync),
 - **monitor** the new installation attempt live,
@@ -128,11 +128,13 @@ After a retry, a live monitor checks the app every 15 seconds for up to 30 minut
 - shows the status timeline (e.g. `Waiting > Installing > Installed`) and elapsed time,
 - writes the final outcome (Installed / Failed again / Timeout) to the backup manifest.
 
-The monitor can be stopped or hidden at any time.
+The monitor can be stopped (**Stop monitoring / cache**) or hidden at any time. Stopping does not cancel the installation.
 
 ### 6. Installation cache capture (optional)
 
-IME usually removes these files after the installation, so capturing them during the run helps keep the downloaded package (installer, scripts, detection files) for troubleshooting.
+When **Get Installation Cache from Package** is checked, the tool copies the app's `C:\Windows\IMECache\<AppId>[_version]` folders to `C:\Temp\IntuneAppRetry-Cache` during the retry and live monitoring.
+
+IME usually removes these files
 
 The capture runs in the background, independent of the GUI, and checks for junctions and symbolic links. It is best effort: very fast installations may finish before everything is copied.
 

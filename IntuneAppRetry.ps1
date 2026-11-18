@@ -1,6 +1,6 @@
-<#
+﻿<#
 .SYNOPSIS
-    Intune App Retry 1.3 - resets and re-triggers failed Intune Win32 app installations locally.
+    Intune App Retry 1.3.1 - resets and re-triggers failed Intune Win32 app installations locally.
 
 .DESCRIPTION
     WPF tool (single file, UI + engine) for IT support. Workflow:
@@ -24,7 +24,7 @@
 
 .NOTES
     Name      : IntuneAppRetry.ps1
-    Version   : 1.3
+    Version   : 1.3.1
     Developer : Sahiti Ditor
     Requires  : Windows PowerShell 5.1 (64-bit, STA), local administrator rights
     Disclaimer: Deleting IME registry keys is an unsupported troubleshooting workaround.
@@ -63,7 +63,7 @@ $script:Rows = @()
 $script:Monitor = $null
 
 [xml]$xaml = @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Intune App Retry 1.3" Width="1300" Height="900" MinWidth="1000" MinHeight="700" WindowStartupLocation="CenterScreen" Background="#F4F6FA" FontFamily="Segoe UI">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Intune App Retry 1.3.1" Width="1300" Height="900" MinWidth="1000" MinHeight="700" WindowStartupLocation="CenterScreen" Background="#F4F6FA" FontFamily="Segoe UI">
  <Grid Margin="24">
   <Grid.RowDefinitions>
    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
@@ -74,7 +74,7 @@ $script:Monitor = $null
     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <StackPanel>
      <TextBlock Text="Intune App Retry" FontSize="26" FontWeight="SemiBold" Foreground="White"/>
-     <TextBlock Text="Review and retry failed Win32 apps - Version 1.3" Margin="0,4,0,0" FontSize="13" Foreground="#C8D6EA"/>
+     <TextBlock Text="Review and retry failed Win32 apps - Version 1.3.1" Margin="0,4,0,0" FontSize="13" Foreground="#C8D6EA"/>
     </StackPanel>
     <Border Grid.Column="1" Background="#274468" CornerRadius="6" Padding="12,8" VerticalAlignment="Center">
      <TextBlock x:Name="GraphState" Foreground="White" Text="Graph: not connected (optional)"/>
@@ -93,6 +93,7 @@ $script:Monitor = $null
    <Button x:Name="Logs" Content="Backups / Logs" Padding="12,10" Margin="0,0,10,0"/>
    <Button x:Name="History" Content="Retry history" Padding="12,10" Margin="0,0,10,0"/>
    <Button x:Name="SyncHelp" Content="MDM sync now" Padding="12,10"/>
+   <Button x:Name="CancelWork" Content="Cancel" Padding="12,10" Margin="10,0,0,0" IsEnabled="False" ToolTip="Cancels the running scan, Graph sign-in or MDM sync. A running retry cannot be cancelled."/>
    <Button x:Name="StopObservation" Content="Stop monitoring / cache" Padding="12,10" Margin="10,0,0,0" IsEnabled="False" ToolTip="Stops observation and cache copying. Does not cancel the installation or registry/service recovery."/>
    <CheckBox x:Name="CaptureCache" Content="Get Installation Cache from Package" Margin="12,8,0,8" VerticalAlignment="Center" ToolTip="During Retry, copy only this app's IMECache folders to C:\Temp\IntuneAppRetry-Cache. Files may be partial while extraction or cleanup is running."/>
   </WrapPanel>
@@ -104,6 +105,7 @@ $script:Monitor = $null
      <TextBox x:Name="DeviceCode" IsReadOnly="True" Width="195" Height="36" FontSize="21" FontFamily="Consolas" FontWeight="Bold" Padding="6,3" BorderBrush="#7A9CCB" TextAlignment="Center" />
      <Button x:Name="CopyCode" Content="Copy code" Padding="14,7" Margin="10,0,8,0"/>
      <Button x:Name="OpenLogin" Content="Open Microsoft login" Padding="14,7"/>
+     <Button x:Name="CancelSignIn" Content="Cancel sign-in" Padding="14,7" Margin="8,0,0,0"/>
     </StackPanel>
     <TextBlock Text="Important: only sign in if you started the Graph sign-in yourself. Do not share the code." Margin="0,6,0,0" Foreground="#385579" FontSize="11"/>
    </StackPanel>
@@ -147,7 +149,7 @@ $script:Monitor = $null
 '@
 $reader = New-Object System.Xml.XmlNodeReader($xaml)
 $window = [Windows.Markup.XamlReader]::Load($reader)
-foreach ($name in @('CaptureCache','StopObservation','Status','BusyBar','BusyText','History','MonitorPanel','StopMonitor','MonitorTitle','MonitorSteps','GraphState','Connect','Refresh','Retry','Logs','SyncHelp','Apps','Activity','SelectedDetails','AuthPanel','DeviceCode','CopyCode','OpenLogin')) {
+foreach ($name in @('CancelWork','CancelSignIn','CaptureCache','StopObservation','Status','BusyBar','BusyText','History','MonitorPanel','StopMonitor','MonitorTitle','MonitorSteps','GraphState','Connect','Refresh','Retry','Logs','SyncHelp','Apps','Activity','SelectedDetails','AuthPanel','DeviceCode','CopyCode','OpenLogin')) {
     Set-Variable -Name $name -Value $window.FindName($name) -Scope Script
 }
 # Shared registry and logging helpers keep scanning and monitoring consistent.
@@ -308,6 +310,8 @@ function Get-LocalAppNames {
     # Only explicit policy ID/name pairs are trusted; nearby log lines may describe other apps.
     param([string[]]$AppIds)
     $names = @{}
+    $parseErrors = 0
+    $readErrors = 0
     if ($AppIds.Count -eq 0 -or -not (Test-Path -LiteralPath $script:LogsRoot)) { return $names }
     $wanted = @{}
     foreach ($id in $AppIds) { $wanted[$id.ToLowerInvariant()] = $true }
@@ -328,22 +332,25 @@ function Get-LocalAppNames {
                 if ($end -lt 0) { $end = $line.LastIndexOf(']') + 1 }
                 if ($end -le $start) { continue }
                 try {
-                    $policies = @($line.Substring($start, $end-$start).Trim() | ConvertFrom-Json -ErrorAction Stop)
-                    foreach ($policy in $policies) {
+                    # Assign directly: Windows PowerShell 5.1 can emit the JSON array as one pipeline object.
+                    $policies = ConvertFrom-Json -InputObject ($line.Substring($start, $end-$start).Trim()) -ErrorAction Stop
+                    foreach ($policy in @($policies)) {
+                        if ($null -eq $policy -or $null -eq $policy.PSObject.Properties['Id'] -or $null -eq $policy.PSObject.Properties['Name']) { continue }
                         $id = [string]$policy.Id
                         $name = [string]$policy.Name
-                        if ($id -and $name -and $wanted.ContainsKey($id.ToLowerInvariant()) -and -not $names.ContainsKey($id.ToLowerInvariant())) {
+                        if ($id -match $script:GuidPattern -and -not [string]::IsNullOrWhiteSpace($name) -and $wanted.ContainsKey($id.ToLowerInvariant()) -and -not $names.ContainsKey($id.ToLowerInvariant())) {
                             $names[$id.ToLowerInvariant()] = $name.Trim()
                         }
                     }
-                } catch { }
+                } catch { $parseErrors++ }
             }
-        } catch { }
+        } catch { $readErrors++ }
         finally {
             if ($null -ne $reader) { $reader.Dispose() }
             elseif ($null -ne $stream) { $stream.Dispose() }
         }
     }
+    Write-Activity ("Local name lookup: resolved $($names.Count) of $($wanted.Count) requested IDs from $($files.Count) log files; parse errors: $parseErrors; read errors: $readErrors.")
     return $names
 }
 
@@ -868,6 +875,9 @@ function Update-Buttons {
     $Retry.IsEnabled = (-not $script:Busy -and -not $observing -and $goodGrs)
     $CaptureCache.IsEnabled = -not $script:Busy -and -not $observing
     $StopObservation.IsEnabled = $observing -or ($script:Busy -and $null -ne $script:Job -and $script:Job.Action -eq 'Retry')
+    $canCancel = $script:Busy -and $null -ne $script:Job -and $script:Job.Action -ne 'Retry' -and -not $script:Job.Cancelled
+    $CancelWork.IsEnabled = $canCancel
+    $CancelSignIn.IsEnabled = $canCancel
     $GraphState.Text = if ($Shared.GraphConnected) { 'Graph: connected' } else { 'Graph: not connected (optional)' }
 }
 
@@ -906,7 +916,18 @@ try {
     throw
 }
 '@, $false)
-    $script:Job = @{ PS=$ps; Handle=$ps.BeginInvoke(); Action=$Action; Selected=$Selected }
+    $script:Job = @{ PS=$ps; Handle=$ps.BeginInvoke(); Action=$Action; Selected=$Selected; Cancelled=$false }
+    Update-Buttons
+}
+
+function Stop-Work {
+    # Retry is never cancelled: interrupting a registry reset could leave IME stopped.
+    $job = $script:Job
+    if ($null -eq $job -or $job.Action -eq 'Retry' -or $job.Cancelled) { return }
+    $job.Cancelled = $true
+    $script:Status.Text = 'Cancelling ...'
+    Write-Activity ('Cancel requested by user: ' + $job.Action)
+    $null = $job.PS.BeginStop($null, $null)
     Update-Buttons
 }
 $timer = New-Object Windows.Threading.DispatcherTimer
@@ -937,6 +958,13 @@ $timer.Add_Tick({
     if ($script:Job -and $script:Job.Handle.IsCompleted) {
         $finished = $script:Job
         try {
+            if ($finished.Cancelled) {
+                try { $null = $finished.PS.EndInvoke($finished.Handle) } catch { }
+                if ($finished.Action -eq 'Connect') { $Shared.DeviceCodeDisplay = $null }
+                $script:Status.Text = 'Cancelled by user. ' + $(if ($finished.Action -eq 'Connect') { 'Graph sign-in aborted.' } else { 'Results may be incomplete; scan again if needed.' })
+                Write-Activity $script:Status.Text
+                return
+            }
             $results = @($finished.PS.EndInvoke($finished.Handle))
             if ($finished.PS.HadErrors) { throw ($finished.PS.Streams.Error | Out-String) }
             $script:Rows = @($results | Where-Object { $null -ne $_ -and $null -ne $_.PSObject.Properties['AppId'] })
@@ -1328,6 +1356,8 @@ $History.Add_Click({
         [Windows.MessageBox]::Show([string]$_.Exception.Message, 'Intune App Retry', 'OK', 'Warning') | Out-Null
     }
 })
+$CancelWork.Add_Click({ Stop-Work })
+$CancelSignIn.Add_Click({ Stop-Work })
 $StopObservation.Add_Click({ Stop-Observation })
 $Refresh.Add_Click({ Start-Work 'Refresh' $null })
 $Connect.Add_Click({ Start-Work 'Connect' $null })

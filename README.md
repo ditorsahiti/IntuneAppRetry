@@ -1,6 +1,6 @@
-# Intune App Retry
+﻿# Intune App Retry
 
-WPF-based PowerShell tool
+WPF-based PowerShell tool (single file) for IT support to **troubleshoot and re-trigger failed Intune Win32 app installations** locally on a Windows client – with registry backups, live monitoring and installation cache capture.
 
 > ⚠️ **Disclaimer:** Deleting Intune Management Extension (IME) registry keys is an **unsupported troubleshooting workaround**. A reset does not guarantee installation success. Use at your own risk.
 
@@ -28,8 +28,8 @@ WPF-based PowerShell tool
    powershell.exe -STA -ExecutionPolicy Bypass -File .\IntuneAppRetry.ps1
    ```
 
-3. The tool scans automatically on start.
-4. *(Optional)* Click **Resolve app names** and sign in with the displayed device code.
+3. The tool scans automatically on start. Use **Cancel** to stop a running scan.
+4. *(Optional)* Click **Resolve app names** and sign in with the displayed device code (or click **Cancel sign-in**).
 5. Select a failed app, click **Retry selected app** and confirm.
 6. Watch the live monitor or open **Retry history** later.
 
@@ -45,10 +45,10 @@ WPF-based PowerShell tool
 
 ## Overview
 
-When a Win32 app installation fails, the Intune Management Extension only retries it according to its internal retry schedule. This can take hours. Intune App Retry
+When a Win32 app installation fails, the Intune Management Extension only retries it according to its internal retry schedule. This can take hours. Intune App Retry gives support staff a guided, safeguarded way to:
 
 - **find** all failed Win32 app installations on the device,
-- **identify** them by name (via Microsoft Graph or IME logs),
+- **identify** them by name (via Microsoft Graph, IME logs or the local IME log cache),
 - **reset** the local app policy state (app result key + GRS key) with a verified backup,
 - **re-trigger** the installation without waiting for the retry schedule (IME restart + MDM sync),
 - **monitor** the new installation attempt live,
@@ -76,6 +76,7 @@ Everything runs locally in a single PowerShell file with a WPF GUI. No modules o
 | **Retry** | Backs up and deletes the app result key and GRS key of the selected app, restarts IME and triggers an MDM sync so the installation is re-evaluated. |
 | **Monitor** | Live monitor after a retry (every 15 s, max. 30 min). Reads all registry contexts and new IME log entries and writes the outcome to the manifest. |
 | **History** | Lists all retries from the backup manifests (time, operator, app, outcome). |
+| **Cancel** | Stops a running scan, Graph sign-in or MDM sync and re-enables the GUI. A running retry cannot be cancelled. |
 | **Cache capture** | Optional: copies the app's `C:\Windows\IMECache\<AppId>[_version]` folders during retry/monitoring to `C:\Temp\IntuneAppRetry-Cache` (best effort). |
 
 ## How it works
@@ -187,6 +188,6 @@ Free to use in unmodified form. Changes are welcome as contributions to this rep
 
 ## Author
 
-Sahiti Ditor — Version 1.3
+Sahiti Ditor — Version 1.3.1
 
 Contact: [ditor.sahiti@outlook.com](mailto:ditor.sahiti@outlook.com)

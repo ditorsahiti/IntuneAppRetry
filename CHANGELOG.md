@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.2
 - **Cancel** and **Stop monitoring / cache** merged into one context-aware button (label changes: Cancel scan / Cancel sign-in / Cancel sync / Stop monitoring / cache)
 - Removed UTF-8 BOM and added a blank first line so the script can be copied and pasted from GitHub
 

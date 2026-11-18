@@ -1,7 +1,7 @@
 
 <#
 .SYNOPSIS
-    Intune App Retry 1.3.1 - resets and re-triggers failed Intune Win32 app installations locally.
+    Intune App Retry 1.3.2 - resets and re-triggers failed Intune Win32 app installations locally.
 
 .DESCRIPTION
     WPF tool (single file, UI + engine) for IT support. Workflow:
@@ -25,7 +25,7 @@
 
 .NOTES
     Name      : IntuneAppRetry.ps1
-    Version   : 1.3.1
+    Version   : 1.3.2
     Developer : Sahiti Ditor
     Requires  : Windows PowerShell 5.1 (64-bit, STA), local administrator rights
     Disclaimer: Deleting IME registry keys is an unsupported troubleshooting workaround.
@@ -64,7 +64,7 @@ $script:Rows = @()
 $script:Monitor = $null
 
 [xml]$xaml = @'
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Intune App Retry 1.3.1" Width="1300" Height="900" MinWidth="1000" MinHeight="700" WindowStartupLocation="CenterScreen" Background="#F4F6FA" FontFamily="Segoe UI">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Intune App Retry 1.3.2" Width="1300" Height="900" MinWidth="1000" MinHeight="700" WindowStartupLocation="CenterScreen" Background="#F4F6FA" FontFamily="Segoe UI">
  <Grid Margin="24">
   <Grid.RowDefinitions>
    <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
@@ -75,7 +75,7 @@ $script:Monitor = $null
     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
     <StackPanel>
      <TextBlock Text="Intune App Retry" FontSize="26" FontWeight="SemiBold" Foreground="White"/>
-     <TextBlock Text="Review and retry failed Win32 apps - Version 1.3.1" Margin="0,4,0,0" FontSize="13" Foreground="#C8D6EA"/>
+     <TextBlock Text="Review and retry failed Win32 apps - Version 1.3.2" Margin="0,4,0,0" FontSize="13" Foreground="#C8D6EA"/>
     </StackPanel>
     <Border Grid.Column="1" Background="#274468" CornerRadius="6" Padding="12,8" VerticalAlignment="Center">
      <TextBlock x:Name="GraphState" Foreground="White" Text="Graph: not connected (optional)"/>

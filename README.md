@@ -188,6 +188,6 @@ Free to use in unmodified form. Changes are welcome as contributions to this rep
 
 ## Author
 
-Sahiti Ditor — Version 1.3.1
+Sahiti Ditor — Version 1.3.2
 
 Contact: [ditor.sahiti@outlook.com](mailto:ditor.sahiti@outlook.com)
